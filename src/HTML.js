@@ -40,6 +40,7 @@ export default class HTML extends PureComponent {
         imagesMaxWidth: PropTypes.number,
         searchTerms: PropTypes.array,
         onAssignRef: PropTypes.func,
+        onAssignViews: PropTypes.func,
         addFoundRefs: PropTypes.func,
         staticContentMaxWidth: PropTypes.number,
         imagesInitialDimensions: PropTypes.shape({
@@ -113,7 +114,6 @@ export default class HTML extends PureComponent {
 
     async registerDOM (props = this.props, cb) {
         const { html, uri } = props;
-        console.log(props)
         if (html) {
             this.setState({ dom: html, loadingRemoteURL: false, errorLoadingRemoteURL: false });
         } else if (props.uri) {
@@ -412,7 +412,7 @@ export default class HTML extends PureComponent {
         } = props;
         return RNElements && RNElements.length ? RNElements.map((element, index) => {
             const { attribs, data, tagName, parentTag, children, nodeIndex, wrapper } = element;
-            const Wrapper = wrapper === 'Text' ? Text : View;
+            const Wrapper = wrapper === 'Text' ? View : View;
             const key = `${wrapper}-${parentIndex}-${nodeIndex}-${tagName}-${index}-${parentTag}`;
             const convertedCSSStyles =
                 attribs && attribs.style ?
@@ -438,6 +438,9 @@ export default class HTML extends PureComponent {
                     return undefined;
                 }
                 // If a custom renderer is available for this tag
+                if(tagName=='a'){
+                    Object.assign(attribs, {name: children[0].data})
+                }
                 return customRenderer(
                     attribs,
                     childElements,
@@ -453,7 +456,7 @@ export default class HTML extends PureComponent {
                         rawChildren: children
                     });
             }
-            if(wrapper=='Text' && data!=null&&this.props.searchTerms){
+            if(wrapper == 'Text' && data != null && this.props.searchTerms){
                 let _arr = data.split(' ')
                 let arr_obj = [];
                 for (let index = 0; index < _arr.length; index++) {
@@ -471,7 +474,7 @@ export default class HTML extends PureComponent {
                     }
                 }
                 return arr_obj.map((item, index)=>{
-                    return <View ref={(node)=>{this.props.onAssignRef(index, node)}} style={{display: 'flex'}}><Text  key={index} style={{backgroundColor: item.highlighted?'yellow': 'white'}}>{item.text}{'  '}</Text></View>
+                    return <><Text key={index} style={{backgroundColor: item.highlighted?'yellow': 'white'}}>{item.text}{'  '}</Text><View ref={(node)=>{this.props.onAssignRef(index, node)}}/></>
                 })
             }
             const classStyles = _getElementClassStyles(attribs, classesStyles);
@@ -509,7 +512,7 @@ export default class HTML extends PureComponent {
                 renderersProps.selectable = textSelectable;
             }
             return (
-                <Wrapper key={key} style={style} {...renderersProps}>
+                <Wrapper key={key} style={[style, {display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start', flexDirection: 'row',  flexWrap: 'wrap'}]} {...renderersProps}>
                     { textElement }
                     { childElements }
                 </Wrapper>
