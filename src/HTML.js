@@ -38,6 +38,9 @@ export default class HTML extends PureComponent {
         onLinkPress: PropTypes.func,
         onParsed: PropTypes.func,
         imagesMaxWidth: PropTypes.number,
+        searchTerms: PropTypes.array,
+        onAssignRef: PropTypes.func,
+        addFoundRefs: PropTypes.func,
         staticContentMaxWidth: PropTypes.number,
         imagesInitialDimensions: PropTypes.shape({
             width: PropTypes.number,
@@ -86,7 +89,7 @@ export default class HTML extends PureComponent {
     }
 
     componentWillReceiveProps (nextProps) {
-        const { html, uri, renderers } = this.props;
+        const { html, uri, renderers, searchTerms } = this.props;
 
         this.generateDefaultStyles(nextProps.baseFontStyle);
         if (renderers !== nextProps.renderers) {
@@ -110,6 +113,7 @@ export default class HTML extends PureComponent {
 
     async registerDOM (props = this.props, cb) {
         const { html, uri } = props;
+        console.log(props)
         if (html) {
             this.setState({ dom: html, loadingRemoteURL: false, errorLoadingRemoteURL: false });
         } else if (props.uri) {
@@ -406,7 +410,6 @@ export default class HTML extends PureComponent {
             tagsStyles,
             textSelectable
         } = props;
-
         return RNElements && RNElements.length ? RNElements.map((element, index) => {
             const { attribs, data, tagName, parentTag, children, nodeIndex, wrapper } = element;
             const Wrapper = wrapper === 'Text' ? Text : View;
@@ -450,7 +453,27 @@ export default class HTML extends PureComponent {
                         rawChildren: children
                     });
             }
-
+            if(wrapper=='Text' && data!=null&&this.props.searchTerms){
+                let _arr = data.split(' ')
+                let arr_obj = [];
+                for (let index = 0; index < _arr.length; index++) {
+                    if(this.props.searchTerms.length>0){
+                        if(_arr[index].toLowerCase().indexOf(this.props.searchTerms[0].toLowerCase())!=-1){
+                            arr_obj.push({text: _arr[index], highlighted: true})
+                            this.props.addFoundRefs(index)
+                        }
+                        else{
+                            arr_obj.push({text:  _arr[index], highlighted: false})
+                        }
+                    }
+                    else{
+                        arr_obj.push({text:  _arr[index], highlighted: false})
+                    }
+                }
+                return arr_obj.map((item, index)=>{
+                    return <View ref={(node)=>{this.props.onAssignRef(index, node)}} style={{display: 'flex'}}><Text  key={index} style={{backgroundColor: item.highlighted?'yellow': 'white'}}>{item.text}{'  '}</Text></View>
+                })
+            }
             const classStyles = _getElementClassStyles(attribs, classesStyles);
             const textElement = data ?
                 <Text
@@ -494,6 +517,44 @@ export default class HTML extends PureComponent {
         }) : false;
     }
 
+    editDistance = (s1, s2) => {
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+    
+        var costs = new Array();
+        for (var i = 0; i <= s1.length; i++) {
+          var lastValue = i;
+          for (var j = 0; j <= s2.length; j++) {
+            if (i == 0) costs[j] = j;
+            else {
+              if (j > 0) {
+                var newValue = costs[j - 1];
+                if (s1.charAt(i - 1) != s2.charAt(j - 1))
+                  newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                costs[j - 1] = lastValue;
+                lastValue = newValue;
+              }
+            }
+          }
+          if (i > 0) costs[s2.length] = lastValue;
+        }
+        return costs[s2.length];
+      };
+    similarity = (s1, s2) => {
+        var longer = s1;
+        var shorter = s2;
+        if (s1.length < s2.length) {
+          longer = s2;
+          shorter = s1;
+        }
+        var longerLength = longer.length;
+        if (longerLength == 0) {
+          return 1.0;
+        }
+        return (
+          (longerLength - this.editDistance(longer, shorter)) / parseFloat(longerLength)
+        );
+      };
     render () {
         const { allowFontScaling, customWrapper, remoteLoadingView, remoteErrorView } = this.props;
         const { RNNodes, loadingRemoteURL, errorLoadingRemoteURL } = this.state;
@@ -516,7 +577,6 @@ export default class HTML extends PureComponent {
                     </View>
                 );
         }
-
         return customWrapper ? customWrapper(RNNodes) : (
             <View style={this.props.containerStyle || {}}>
                 { RNNodes }
